@@ -4,42 +4,45 @@ pipeline {
   environment {
     TF_DIR = 'terraform'
     ANSIBLE_DIR = 'ansible'
-    AWS_REGION = 'eu-central-1' // or your region
+    PRIVATE_KEY_PATH = "${env.WORKSPACE}/${ANSIBLE_DIR}/terraform-key.pem"
   }
 
   stages {
-    stage('Checkout Code') {
+    stage('Checkout Terraform (main)') {
       steps {
-        git url: 'https://github.com/veliJJ/Project-02.git', branch: 'main'
+        // Checkout main branch for Terraform
+        checkout([$class: 'GitSCM', branches: [[name: 'refs/heads/main']], userRemoteConfigs: [[url: 'git@github.com:youruser/yourrepo.git']]])
       }
     }
 
-    stage('Terraform Init & Apply') {
+    stage('Terraform Apply') {
       steps {
-        dir("${env.TF_DIR}") {
-          withCredentials([usernamePassword(credentialsId: 'aws-credentials', usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')]) {
-            sh '''
-              terraform init
-              terraform apply -auto-approve
-            '''
-          }
+        dir(TF_DIR) {
+          sh '''
+            terraform init
+            terraform apply -auto-approve
+            terraform output -raw ec2_private_key > ../${ANSIBLE_DIR}/terraform-key.pem
+            chmod 600 ../${ANSIBLE_DIR}/terraform-key.pem
+          '''
         }
+      }
+    }
+
+    stage('Checkout Ansible branch') {
+      steps {
+        // Checkout ansible branch for Ansible code
+        checkout([$class: 'GitSCM', branches: [[name: 'refs/heads/ansible']], userRemoteConfigs: [[url: 'git@github.com:youruser/yourrepo.git']]])
       }
     }
 
     stage('Run Ansible Playbook') {
       steps {
-        dir("${env.ANSIBLE_DIR}") {
-          withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'KEY_PATH')]) {
-            // Assume Terraform outputs IP to a file or stdout
-            sh '''
-              INSTANCE_IP=$(cd ../terraform && terraform output -raw instance_ip)
-              ansible-playbook -i "$INSTANCE_IP," playbook.yml --private-key $KEY_PATH -u ec2-user
-            '''
-          }
+        dir(ANSIBLE_DIR) {
+          sh """
+            ansible-playbook -i inventory.ini playbook.yml --private-key=${PRIVATE_KEY_PATH}
+          """
         }
       }
     }
   }
 }
-
