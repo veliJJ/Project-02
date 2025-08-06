@@ -10,8 +10,9 @@ pipeline {
   stages {
     stage('Checkout Terraform (main)') {
       steps {
-        // Checkout main branch for Terraform
-        checkout([$class: 'GitSCM', branches: [[name: 'refs/heads/main']], userRemoteConfigs: [[url: 'git@github.com:youruser/yourrepo.git']]])
+        dir(TF_DIR) {
+          checkout([$class: 'GitSCM', branches: [[name: 'refs/heads/main']], userRemoteConfigs: [[url: 'https://github.com/veliJJ/Project-02.git']]])
+        }
       }
     }
 
@@ -21,7 +22,7 @@ pipeline {
           sh '''
             terraform init
             terraform apply -auto-approve
-            terraform output -raw ec2_private_key > ../${ANSIBLE_DIR}/terraform-key.pem
+            terraform output -raw private_key_pem > ../${ANSIBLE_DIR}/terraform-key.pem
             chmod 600 ../${ANSIBLE_DIR}/terraform-key.pem
           '''
         }
@@ -30,8 +31,9 @@ pipeline {
 
     stage('Checkout Ansible branch') {
       steps {
-        // Checkout ansible branch for Ansible code
-        checkout([$class: 'GitSCM', branches: [[name: 'refs/heads/ansible']], userRemoteConfigs: [[url: 'git@github.com:youruser/yourrepo.git']]])
+        dir(ANSIBLE_DIR) {
+          checkout([$class: 'GitSCM', branches: [[name: 'refs/heads/ansible']], userRemoteConfigs: [[url: 'https://github.com/veliJJ/Project-02.git']]])
+        }
       }
     }
 
